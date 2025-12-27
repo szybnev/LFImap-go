@@ -1,5 +1,0 @@
-requests
-urllib3
-argparse
-pybase64
-bs4
