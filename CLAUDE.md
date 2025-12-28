@@ -4,77 +4,102 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LFImap is a Python-based security testing tool for discovering and exploiting Local File Inclusion (LFI) vulnerabilities in web applications. Despite the repository name containing "go", this is a pure Python project.
-
-**Status:** Pre-alpha (v0.1.4), major release 1.0 planned
+LFImap is a Go-based security testing tool for discovering and exploiting Local File Inclusion (LFI) vulnerabilities in web applications.
 
 ## Build and Development Commands
 
 ```bash
-# Install for development
-pip install -e .
+# Build the binary
+go build ./cmd/lfimap
 
-# Run directly without installation
-python3 lfimap/lfimap.py -h
+# Run directly without building
+go run ./cmd/lfimap -h
 
 # Run tests
-pytest lfimap/src/tests/test_tests.py -v
+go test ./...
 
-# Run a single test
-pytest lfimap/src/tests/test_tests.py::test_test_rfi -v
+# Run a specific package's tests
+go test ./internal/attacks -v
+
+# Install globally
+go install ./cmd/lfimap
 ```
 
 ## Architecture
 
 ### Entry Point
-- `lfimap/lfimap.py::main()` - CLI orchestrator that validates args, loads URLs, and runs attack modules
+- `cmd/lfimap/main.go` - CLI entry point that parses args, creates scanner, and runs attacks
 
 ### Core Flow
-1. `checkArgs()` validates CLI parameters
-2. `init_args()` initializes argument dictionary (cached globally in `src.utils.arguments.args`)
-3. URLs loaded from `-U`, `-F`, or `-R` flags
-4. `prepareRequest()` injects payloads at parameter locations (default marker: `PWN`)
-5. Attack modules execute via `REQUEST()` function
-6. `checkPayload()` validates successful exploitation
+1. `cli.ParseArgs()` parses CLI arguments using Cobra
+2. `cli.ValidateArgs()` validates the parsed arguments
+3. `config.NewConfig()` creates configuration from arguments
+4. `scanner.NewScanner()` creates the scanner with HTTP client and attack modules
+5. `scanner.Run()` loads targets and runs registered attacks
+6. `exploit.Pwn()` attempts exploitation if vulnerabilities found with --exploit flag
 
-### Key Modules
+### Key Packages
 
-**Attack Modules** (`lfimap/src/attacks/`):
-- Each follows pattern: `test_[type](url, post_data)` returns when exploitation found
-- `filter.py`, `input.py`, `data.py`, `expect.py` - PHP wrapper attacks
-- `file.py` - File wrapper attacks
-- `trunc.py` - Path traversal with wordlists
-- `rfi.py` - Remote File Inclusion
-- `cmdi.py` - Command injection
-- `heur.py` - Heuristic tests (XSS, CRLF, open redirect)
-- `pwn.py` - Response validation for successful exploitation
+**cmd/lfimap/** - Entry point
+- `main.go` - CLI orchestration, signal handling, scanner invocation
 
-**HTTP Handling** (`lfimap/src/httpreqs/`):
-- `request.py` - Core request/response logic, `prepareRequest()`, `REQUEST()`
-- `get.py`, `post.py` - Method-specific handling
+**internal/config/** - Configuration
+- `config.go` - Config struct, Arguments, KeyWords for detection, ToReplace for payload signatures
 
-**Configuration** (`lfimap/src/configs/config.py`):
-- Global state: `checkedHosts`, `exploits`, `proxies`
-- `KEY_WORDS` - Indicators of successful exploitation (e.g., `root:x:0:0`)
-- `csrf_params` - Common CSRF token parameter names
+**internal/cli/** - CLI handling
+- `arguments.go` - Cobra-based argument parsing (40+ flags)
+- `banner.go` - ASCII banner display
 
-**Utilities** (`lfimap/src/utils/`):
-- `arguments.py` - CLI argument parsing with argparse
-- `stats.py` - Global statistics tracking (`requests`, `vulns`, `urls`)
-- `colors.py` - Terminal colored output prefixes: `[i]` info, `[+]` success, `[-]` failure
+**internal/http/** - HTTP handling
+- `client.go` - HTTP client with proxy support (HTTP/HTTPS/SOCKS5)
+- `headers.go` - User-Agent rotation, header management
+- `request.go` - Core request/response handling, CSRF support, logging
+- `response.go` - Payload detection via KeyWords matching
+
+**internal/attacks/** - Attack modules
+- `attack.go` - Attack interface definition
+- `filter.go` - PHP filter wrapper (11 payloads)
+- `input.go` - PHP input wrapper (POST/GET modes)
+- `data.go` - PHP data wrapper with base64
+- `expect.go` - PHP expect wrapper (Linux/Windows)
+- `file.go` - File wrapper (4 payloads with null byte)
+- `trunc.go` - Path truncation with wordlist
+- `rfi.go` - Remote file inclusion (local/internet/callback modes)
+- `cmdi.go` - Command injection with IFS bypass
+- `heuristics.go` - XSS, CRLF, info disclosure, open redirect
+
+**internal/exploit/** - Exploitation
+- `pwn.go` - Reverse shell orchestration (bash, nc, PHP, Perl, PowerShell)
+
+**internal/servers/** - Supporting servers
+- `httpserver.go` - HTTP server for RFI payload hosting
+- `listener.go` - TCP listener for reverse shell connections
+
+**internal/scanner/** - Scanner orchestration
+- `scanner.go` - Target loading, attack registration and execution
+
+**internal/util/** - Utilities
+- `colors.go` - Terminal color output with ANSI codes
+- `encoding.go` - Base64 and URL encoding utilities
+- `parseurl.go` - URL parsing and parameter injection
+- `stats.go` - Thread-safe statistics tracking
+- `cleanup.go` - Resource cleanup utilities
+
+**resources/** - Embedded resources
+- `embed.go` - go:embed directives for wordlists and exploits
+- `wordlists/` - Path traversal wordlists (short.txt, long.txt)
+- `exploits/` - RFI payload files
 
 ### Testing Pattern
-Tests spawn a mock HTTP server on 127.0.0.1:8080 with marker-based responses. Test files use `custom_init_args()` to configure the argument dictionary directly.
+Tests use `go test` with the standard testing package. Mock HTTP servers can be created using `net/http/httptest`.
 
-### Payloads
-- Stored URL-encoded in attack modules
-- Additional encoding via `-n U` (URL) or `-n B` (Base64)
-- RFI markers: `ysvznc.php`, `ysvznc.jsp`, etc. in `src/exploits/`
-- Wordlists in `src/wordlists/` (short.txt default, long.txt extended)
+### Key Patterns
 
-## Important Patterns
-
-- Global argument caching: `init_args()` stores in `src.utils.arguments.args`
-- Quick mode (`-q`): Returns after first successful test per attack type
-- `--no-stop`: Continues testing same technique after findings
-- Default attacks (no flags): filter, input, data, expect, file, RFI, truncation (not cmd/heuristics)
+- **Context-based configuration**: Config passed through RequestContext instead of globals
+- **Thread safety**: sync.RWMutex for statistics and exploit tracking
+- **Embedded resources**: go:embed for wordlists and exploit files
+- **Attack interface**: All attacks implement the Attack interface with Test() method
+- **Placeholder injection**: Default "PWN" marker replaced with payloads
+- **Payload detection**: 30+ keywords in KeyWords slice for success detection
+- **Quick mode** (`-q`): Returns after first successful test per attack type
+- **NoStop mode** (`--no-stop`): Continues testing same technique after findings

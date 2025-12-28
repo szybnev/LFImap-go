@@ -163,6 +163,7 @@ cython_debug/
 #.idea/
 
 # Go binaries and build artifacts
+lfimap
 bin/
 *.exe
 *.exe~
